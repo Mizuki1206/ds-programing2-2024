@@ -15,18 +15,27 @@ def main(page: ft.Page):
     page.padding = 0
 
     weather_view = ft.Container(
-        content=ft.Text("Active view", color="white"),
+        content=ft.Text("地域を選択してください", color="white"),
         alignment=ft.alignment.center,
         bgcolor=ft.colors.SURFACE_VARIANT,
         expand=True,
     )
 
-    def weather(e, area_code):
+    def weather(e, center_code, region_name):
         try:
+            # centersから対応するchildrenの最初のコードを取得
+            area_code = centers[center_code]["children"][0]
             weather_data = get_weather_data(area_code)
             weather_info = weather_data[0]["timeSeries"][0]["areas"][0]
             weather = weather_info["weather"]
-            weather_view.content = ft.Text(f"天気: {weather}", color="white")
+            temps = weather_data[0]["timeSeries"][2]["areas"][0]["temps"]
+            
+            weather_view.content = ft.Column([
+                ft.Text(f"{region_name}の天気", size=20, color="white"),
+                ft.Text(f"天気: {weather}", color="white"),
+                ft.Text(f"最高気温: {temps[1]}℃", color="white"),
+                ft.Text(f"最低気温: {temps[0]}℃", color="white")
+            ], alignment=ft.MainAxisAlignment.CENTER)
             page.update()
         except Exception as e:
             weather_view.content = ft.Text(f"エラーが発生しました:{str(e)}", color="white")
@@ -35,18 +44,16 @@ def main(page: ft.Page):
     area_data = get_area_data()
     centers = area_data["centers"]
 
-    # 地域メニューの作成
     region_menu = ft.Column(
         controls=[
             ft.Container(
-                content=ft.Text("地域を選択", color="white"),
+                content=ft.Text("地域を選択", color="white", weight=ft.FontWeight.BOLD),
                 padding=10,
             )
         ],
         scroll=ft.ScrollMode.AUTO,
     )
 
-    # 各地域のボタンを作成
     for code, region in centers.items():
         region_menu.controls.append(
             ft.Container(
@@ -57,11 +64,10 @@ def main(page: ft.Page):
                 padding=10,
                 margin=ft.margin.only(bottom=5),
                 ink=True,
-                on_click=lambda e, code=code: weather(e, code),
+                on_click=lambda e, code=code, name=region["name"]: weather(e, code, name),
             )
         )
 
-    # レイアウトの設定
     page.add(
         ft.Row(
             [
