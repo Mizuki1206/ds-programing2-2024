@@ -1,10 +1,6 @@
 import flet as ft
 import requests
 
-
-def main(page: ft.Page):
-    page.title = "天気予報アプリ"
-
 def get_area_data():
     url = "https://www.jma.go.jp/bosai/common/const/area.json"
     return requests.get(url).json()
@@ -28,13 +24,13 @@ def main(page: ft.Page):
             weather_text.value = f"エラーが発生しました:{str(e)}"
 
     area_data = get_area_data()
-    class10s = area_data["class10s"]
+    centers = area_data["centers"]
 
     area_Dropdown = ft.Dropdown(
         width = 400,
         options = [
             ft.dropdown.Option(key = code, text = region["name"])
-            for code, region in class10s.items()
+            for code, region in centers.items()
         ]
     )
 
