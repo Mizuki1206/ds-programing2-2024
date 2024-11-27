@@ -16,23 +16,40 @@ def get_weather_data(area_code):
 def main(page: ft.Page):
     page.title = "天気予報アプリ"
 
-    area_dara = get_area_data()
-    
+    weather_text = ft.Text()
 
-    rail = ft.NavigationRail(
-        selected_index = 0,
-        label_type = ft.NavigationRailLabelType.All,
-        extended = True,
-        destinations = [
-            ft.NavigationRailDestination(
-                icon = ft.icons.FAVORITE_BORDER,
-                selected_icon = ft.icons.FAVORITE,
-                label = "地域を選択"
-            ),
+    def weather(e, area_code):
+        try:
+            weather_data = get_weather_data(area_code)
+            weather_info = weather_data[0]["timeSeries"][0]["areas"][0]
+            weather = weather_info["weather"]
+            weather_text.value = f"天気: {weather}"
+        except:
+            weather_text.value = f"エラーが発生しました:{str(e)}"
+
+    area_data = get_area_data()
+    class10s = area_data["class10s"]
+
+    area_Dropdown = ft.Dropdown(
+        width = 400,
+        options = [
+            ft.dropdown.Option(key = code, text = f"{region['name']}")
         ]
     )
 
-    area_list = 
+    weather_button = ft.ElevatedButton(
+        text = "天気を表示",
+        on_click = lambda e: weather(e, area_Dropdown.value)
+    )
+
+    page.add(
+        ft.Column([
+            ft.Text("地域を選択してください", size = 20),
+            area_Dropdown,
+            weather_button,
+            weather_text
+        ])
+    )
 
 
 
