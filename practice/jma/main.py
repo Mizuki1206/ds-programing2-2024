@@ -33,7 +33,8 @@ def main(page: ft.Page):
     area_Dropdown = ft.Dropdown(
         width = 400,
         options = [
-            ft.dropdown.Option(key = code, text = f"{region['name']}")
+            ft.dropdown.Option(key = code, text = region["name"])
+            for code, region in class10s.items()
         ]
     )
 
