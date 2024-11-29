@@ -140,48 +140,77 @@ def main(page: ft.Page):
         weather_container.content = WeatherView(weather_data)
         page.update()
 
-    # areas.jsonからデータを読み込む
     try:
         with open(AREAS_JSON_PATH, 'r', encoding='utf-8') as f:
             areas_data = json.load(f)
+
+        def create_navigation_items():
+            navigation_items = []
             
-        # ナビゲーションレールの destinations を作成
-        destinations = []
-        for center_code, center_info in areas_data['centers'].items():
-            destinations.append(
-                ft.NavigationRailDestination(
-                    icon=ft.icons.LOCATION_ON_OUTLINED,
-                    selected_icon=ft.icons.LOCATION_ON,
-                    label=center_info['name'],  # 地方名（例：北海道地方、東北地方）
-                    data=center_code
+            # 地方（centers）のループ
+            for center_code, center_info in areas_data['centers'].items():
+                center_children = []
+                
+                # 各地方の子要素（offices）を処理
+                for office_code in center_info['children']:
+                    if office_code in areas_data['offices']:
+                        office_info = areas_data['offices'][office_code]
+                        
+                        # class10sの情報を取得
+                        class10_children = []
+                        for class10_code in office_info['children']:
+                            if class10_code in areas_data['class10s']:
+                                class10_info = areas_data['class10s'][class10_code]
+                                class10_children.append(
+                                    ft.NavigationRailDestination(
+                                        icon=ft.icons.LOCATION_ON_OUTLINED,
+                                        selected_icon=ft.icons.LOCATION_ON,
+                                        label=class10_info['name'],
+                                        data=class10_code
+                                    )
+                                )
+                        
+                        # officesレベルのナビゲーションアイテム
+                        center_children.append(
+                            ft.ExpansionTile(
+                                title=ft.Text(office_info['name']),
+                                subtitle=ft.Text(office_info['officeName']),
+                                children=class10_children
+                            )
+                        )
+
+                # centersレベルのナビゲーションアイテム
+                navigation_items.append(
+                    ft.ExpansionTile(
+                        title=ft.Text(center_info['name']),
+                        subtitle=ft.Text(center_info['officeName']),
+                        children=center_children
+                    )
                 )
-            )
+            
+            return navigation_items
+
+        # ナビゲーションパネルの作成
+        navigation_panel = ft.Column(
+            controls=create_navigation_items(),
+            scroll=ft.ScrollMode.AUTO,
+            expand=True
+        )
+
     except Exception as e:
         print(f"Error loading areas data: {e}")
-        destinations = [
-            ft.NavigationRailDestination(
-                icon=ft.icons.LOCATION_ON_OUTLINED,
-                selected_icon=ft.icons.LOCATION_ON,
-                label="広島県",
-                data="340000"
-            )
-        ]
-
-    # ナビゲーションレール
-    rail = ft.NavigationRail(
-        selected_index=None,
-        label_type=ft.NavigationRailLabelType.ALL,
-        extended=True,
-        min_width=100,
-        min_extended_width=200,
-        destinations=destinations,
-        on_change=on_region_select
-    )
+        navigation_panel = ft.Column([
+            ft.Text("データの読み込みに失敗しました")
+        ])
 
     # メインレイアウト
     page.add(
         ft.Row([
-            rail,
+            ft.Container(
+                content=navigation_panel,
+                width=300,
+                border=ft.border.all(1, ft.colors.OUTLINE),
+            ),
             ft.VerticalDivider(width=1),
             weather_container
         ], expand=True)
