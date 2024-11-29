@@ -1,14 +1,14 @@
 import flet as ft
-import requests
 import json
 from datetime import datetime
 
 class WeatherApp:
     def __init__(self):
-        self.load_area_data()
+        self.area_data = None
         self.current_weather_data = None
+        self.load_data()
 
-    def load_area_data(self):
+    def load_data(self):
         # 地域データの読み込み
         try:
             with open('areas.json', 'r', encoding='utf-8') as f:
@@ -16,18 +16,6 @@ class WeatherApp:
         except Exception as e:
             print(f"Error loading area data: {e}")
             self.area_data = {}
-
-    def get_regions(self):
-        # 地方一覧を取得
-        regions = []
-        for code, info in self.area_data['centers'].items():
-            regions.append({
-                'code': code,
-                'name': info['name'],
-                'office': info['officeName'],
-                'children': info['children']
-            })
-        return regions
 
     def get_weather_data(self, area_code):
         # 天気データの読み込み
@@ -74,29 +62,23 @@ class WeatherView(ft.UserControl):
         # 天気予報カードの作成
         weather_cards = []
         for i, date in enumerate(weather_info['timeDefines']):
-            area_info = weather_info['areas'][0]  # 南部のデータを使用
+            area_info = weather_info['areas'][0]  # 最初のエリアのデータを使用
             weather_code = area_info['weatherCodes'][i]
             weather_desc = area_info['weathers'][i]
 
             # 気温データの取得
             temp = "-- ℃"
-            if i < len(temp_info['timeDefines']):
+            if i < len(temp_info['areas'][0]['temps']):
                 temp = f"{temp_info['areas'][0]['temps'][i]} ℃"
 
             card = ft.Card(
                 content=ft.Container(
                     padding=20,
                     content=ft.Column([
-                        ft.Text(format_date(date), 
-                               size=16, 
-                               weight=ft.FontWeight.BOLD),
-                        ft.Text(get_weather_icon(weather_code), 
-                               size=32),
-                        ft.Text(weather_desc, 
-                               size=14,
-                               text_align=ft.TextAlign.CENTER),
-                        ft.Text(f"気温: {temp}", 
-                               size=14),
+                        ft.Text(format_date(date), size=16, weight=ft.FontWeight.BOLD),
+                        ft.Text(get_weather_icon(weather_code), size=32),
+                        ft.Text(weather_desc, size=14, text_align=ft.TextAlign.CENTER),
+                        ft.Text(f"気温: {temp}", size=14),
                     ], 
                     spacing=10,
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -124,7 +106,6 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.LIGHT
 
     weather_app = WeatherApp()
-    regions = weather_app.get_regions()
 
     # 天気表示用のコンテナ
     weather_container = ft.Container(
@@ -152,9 +133,9 @@ def main(page: ft.Page):
             ft.NavigationRailDestination(
                 icon=ft.icons.LOCATION_ON_OUTLINED,
                 selected_icon=ft.icons.LOCATION_ON,
-                label=region['name'],
-                data=region['code']
-            ) for region in regions
+                label="広島県",  # 地域名を直接指定
+                data="340000"    # 地域コードを直接指定
+            )
         ],
         on_change=on_region_select
     )
