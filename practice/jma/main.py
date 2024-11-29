@@ -34,6 +34,12 @@ def main(page: ft.Page):
         ]
     )
 
+
+    weather_button = ft.ElevatedButton(
+        text = "天気を表示",
+        on_click = lambda e: weather(e, area_Dropdown.value)
+    )
+
     page.add(
         ft.Column([
             ft.Text("地域を選択してください", size = 20),
@@ -41,12 +47,6 @@ def main(page: ft.Page):
             weather_button,
             weather_text
         ])
-    )
-
-
-    weather_button = ft.ElevatedButton(
-        text = "天気を表示",
-        on_click = lambda e: weather(e, area_Dropdown.value)
     )
 
 
