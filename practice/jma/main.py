@@ -140,6 +140,33 @@ def main(page: ft.Page):
         weather_container.content = WeatherView(weather_data)
         page.update()
 
+    # areas.jsonからデータを読み込む
+    try:
+        with open(AREAS_JSON_PATH, 'r', encoding='utf-8') as f:
+            areas_data = json.load(f)
+            
+        # ナビゲーションレールの destinations を作成
+        destinations = []
+        for center_code, center_info in areas_data['centers'].items():
+            destinations.append(
+                ft.NavigationRailDestination(
+                    icon=ft.icons.LOCATION_ON_OUTLINED,
+                    selected_icon=ft.icons.LOCATION_ON,
+                    label=center_info['name'],  # 地方名（例：北海道地方、東北地方）
+                    data=center_code
+                )
+            )
+    except Exception as e:
+        print(f"Error loading areas data: {e}")
+        destinations = [
+            ft.NavigationRailDestination(
+                icon=ft.icons.LOCATION_ON_OUTLINED,
+                selected_icon=ft.icons.LOCATION_ON,
+                label="広島県",
+                data="340000"
+            )
+        ]
+
     # ナビゲーションレール
     rail = ft.NavigationRail(
         selected_index=None,
@@ -147,14 +174,7 @@ def main(page: ft.Page):
         extended=True,
         min_width=100,
         min_extended_width=200,
-        destinations=[
-            ft.NavigationRailDestination(
-                icon=ft.icons.LOCATION_ON_OUTLINED,
-                selected_icon=ft.icons.LOCATION_ON,
-                label="広島県",
-                data="340000"
-            )
-        ],
+        destinations=destinations,
         on_change=on_region_select
     )
 
