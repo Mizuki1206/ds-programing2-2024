@@ -1,71 +1,139 @@
 import requests
-import flet
+import flet as ft
+import json
 
-class WeatherApp:
-    def __init__(self, master):
-        self.master = master
-        master.title("天気予報")
+def main(page: ft.Page):
+    page.title = "天気予報アプリ"
+    page.window_width = 1000
+    page.window_height = 600
 
-        # 地域選択用のドロップダウンメニューを作成
-        self.region_label = tk.Label(master, text="地域を選択:")
-        self.region_label.pack(pady=10)
-
-        self.region_var = tk.StringVar()
-        self.region_dropdown = ttk.Combobox(master, textvariable=self.region_var)
-        self.region_dropdown.pack()
-
-        # 地域コードの辞書を作成
-        self.region_codes = {
-            "北海道地方": "010100",
-            "東北地方": "020000",
-            "関東地方": "040000",
-            "中部地方": "050000",
-            "近畿地方": "060000",
-            "中国地方": "070000",
-            "四国地方": "080000",
-            "九州地方": "090000"
-        }
-
-        # ドロップダウンメニューにオプションを設定
-        self.region_dropdown["values"] = list(self.region_codes.keys())
-        self.region_dropdown.current(0)  # 初期値を北海道地方に設定
-
-        # 天気予報を表示するラベルを作成
-        self.weather_label = tk.Label(master, text="", font=("Arial", 16))
-        self.weather_label.pack(pady=20)
-
-        # 天気予報を取得するボタンを作成
-        self.get_forecast_button = tk.Button(master, text="天気予報を取得", command=self.get_weather_forecast)
-        self.get_forecast_button.pack(pady=10)
-
-    def get_weather_forecast(self):
-        # 選択された地域のエリアコードを取得
-        selected_region = self.region_var.get()
-        area_code = self.region_codes[selected_region]
-
-        # 気象庁のAPIからデータを取得
-        area_url = f"https://www.jma.go.jp/bosai/common/const/area.json"
-        forecast_url = f"https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json"
-
+    def get_area_data():
+        """地域データを取得する関数"""
         try:
-            # エリア情報を取得
-            area_response = requests.get(area_url)
-            area_data = area_response.json()
+            response = requests.get('https://www.jma.go.jp/bosai/common/const/area.json')
+            return response.json()
+        except:
+            return {}
 
-            # 天気予報データを取得
-            forecast_response = requests.get(forecast_url)
-            forecast_data = forecast_response.json()
+    def get_weather_data(area_code):
+        """特定地域の天気データを取得する関数"""
+        try:
+            url = f'https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json'
+            response = requests.get(url)
+            return response.json()[0]
+        except:
+            return {}
 
-            # 天気予報の情報を抽出
-            today_weather = forecast_data[0]["timeSeries"][0]["areas"][0]
-            weather_text = f"{today_weather['weathers'][0]}\n気温: {today_weather['temps'][0]}°C"
+    def on_area_select(e):
+        """地域が選択された時の処理"""
+        area_code = e.control.data
+        weather_data = get_weather_data(area_code)
+        
+        if weather_data:
+            try:
+                weather_info = weather_data['timeSeries'][0]['areas'][0]
+                temps = weather_data['timeSeries'][2]['areas'][0]['temps']
+                
+                weather_display.content = ft.Column(
+                    controls=[
+                        ft.Card(
+                            content=ft.Container(
+                                content=ft.Column(
+                                    controls=[
+                                        ft.Text(
+                                            f"地域: {weather_info['area']['name']}", 
+                                            size=20, 
+                                            weight=ft.FontWeight.BOLD
+                                        ),
+                                        ft.Text(
+                                            f"天気: {weather_info.get('weathers', ['データなし'])[0]}", 
+                                            size=16
+                                        ),
+                                        ft.Text(
+                                            f"気温: {temps[0]}℃", 
+                                            size=16
+                                        ),
+                                    ]
+                                ),
+                                padding=20
+                            )
+                        )
+                    ]
+                )
+                page.update()
+            except:
+                weather_display.content = ft.Text("データの取得に失敗しました")
+                page.update()
 
-            # 天気予報を表示
-            self.weather_label.config(text=weather_text)
+    def create_area_tree():
+        """階層構造のある地域リストを作成"""
+        area_data = get_area_data()
+        area_tree = ft.ListView(expand=1, spacing=10, padding=20)
 
-        except requests.exceptions.RequestException as e:
-            self.weather_label.config(text=f"エラーが発生しました: {e}")
+        if 'centers' in area_data and 'offices' in area_data:
+            # 地方ごとの ExpansionTile を作成
+            for center_code, center_info in area_data['centers'].items():
+                sub_areas = []
+                
+                # その地方に属する都道府県を追加
+                if 'children' in center_info:
+                    for office_code in center_info['children']:
+                        if office_code in area_data['offices']:
+                            office_info = area_data['offices'][office_code]
+                            
+                            # さらに細かい地域がある場合
+                            sub_regions = []
+                            if 'children' in office_info:
+                                for child_code in office_info['children']:
+                                    # 地域コードから地域名を取得（実際のデータ構造に応じて調整が必要）
+                                    sub_regions.append(
+                                        ft.TextButton(
+                                            text=f"- {child_code}",
+                                            data=child_code,
+                                            on_click=on_area_select
+                                        )
+                                    )
 
-root = tk.Tk()
-app = WeatherApp(root)
-root.mainloop()
+                            # 都道府県レベルの ExpansionTile
+                            sub_areas.append(
+                                ft.ExpansionTile(
+                                    title=ft.Text(office_info['name']),
+                                    controls=sub_regions
+                                )
+                            )
+
+                # 地方レベルの ExpansionTile
+                area_tree.controls.append(
+                    ft.ExpansionTile(
+                        title=ft.Text(center_info['name']),
+                        controls=sub_areas
+                    )
+                )
+
+        return area_tree
+
+    # 天気情報表示エリア
+    weather_display = ft.Container(
+        content=ft.Text("地域を選択してください"),
+        expand=True,
+        padding=20
+    )
+
+    # メインレイアウト
+    page.add(
+        ft.Row(
+            controls=[
+                # 左側：階層構造の地域リスト
+                ft.Container(
+                    content=create_area_tree(),
+                    width=300,
+                    bgcolor=ft.colors.BLUE_GREY_100,
+                ),
+                # 右側：天気情報
+                weather_display
+            ],
+            expand=True
+        )
+    )
+
+ft.app(target=main)
