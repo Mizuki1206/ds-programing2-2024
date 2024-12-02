@@ -8,7 +8,6 @@ def main(page: ft.Page):
     page.window_height = 600
 
     def get_area_data():
-        """地域データを取得する関数"""
         try:
             response = requests.get('https://www.jma.go.jp/bosai/common/const/area.json')
             return response.json()
@@ -16,7 +15,6 @@ def main(page: ft.Page):
             return {}
 
     def get_weather_data(area_code):
-        """特定地域の天気データを取得する関数"""
         try:
             url = f'https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json'
             response = requests.get(url)
@@ -25,8 +23,8 @@ def main(page: ft.Page):
             return {}
 
     def on_area_select(e):
-        """地域が選択された時の処理"""
         area_code = e.control.data
+        area_name = e.control.text  # ボタンのテキスト（地域名）を取得
         weather_data = get_weather_data(area_code)
         
         if weather_data:
@@ -41,21 +39,25 @@ def main(page: ft.Page):
                                 content=ft.Column(
                                     controls=[
                                         ft.Text(
-                                            f"地域: {weather_info['area']['name']}", 
+                                            f"地域: {area_name}", 
                                             size=20, 
-                                            weight=ft.FontWeight.BOLD
+                                            weight=ft.FontWeight.BOLD,
+                                            color=ft.colors.BLACK
                                         ),
                                         ft.Text(
                                             f"天気: {weather_info.get('weathers', ['データなし'])[0]}", 
-                                            size=16
+                                            size=16,
+                                            color=ft.colors.BLACK
                                         ),
                                         ft.Text(
                                             f"気温: {temps[0]}℃", 
-                                            size=16
+                                            size=16,
+                                            color=ft.colors.BLACK
                                         ),
                                     ]
                                 ),
-                                padding=20
+                                padding=20,
+                                bgcolor=ft.colors.WHITE
                             )
                         )
                     ]
@@ -66,47 +68,51 @@ def main(page: ft.Page):
                 page.update()
 
     def create_area_tree():
-        """階層構造のある地域リストを作成"""
         area_data = get_area_data()
         area_tree = ft.ListView(expand=1, spacing=10, padding=20)
 
+        # 地域名とコードのマッピングを作成
+        area_names = {}
+        if 'offices' in area_data:
+            for code, info in area_data['offices'].items():
+                area_names[code] = info['name']
+
         if 'centers' in area_data and 'offices' in area_data:
-            # 地方ごとの ExpansionTile を作成
             for center_code, center_info in area_data['centers'].items():
                 sub_areas = []
                 
-                # その地方に属する都道府県を追加
                 if 'children' in center_info:
                     for office_code in center_info['children']:
                         if office_code in area_data['offices']:
                             office_info = area_data['offices'][office_code]
                             
-                            # さらに細かい地域がある場合
-                            sub_regions = []
                             if 'children' in office_info:
                                 for child_code in office_info['children']:
-                                    # 地域コードから地域名を取得（実際のデータ構造に応じて調整が必要）
-                                    sub_regions.append(
+                                    # 地域名を取得（存在しない場合はコードを使用）
+                                    area_name = area_names.get(child_code, child_code)
+                                    sub_areas.append(
                                         ft.TextButton(
-                                            text=f"- {child_code}",
-                                            data=child_code,
-                                            on_click=on_area_select
+                                            text=area_name,  # 地域名を表示
+                                            data=child_code,  # コードはデータとして保持
+                                            on_click=on_area_select,
+                                            style=ft.ButtonStyle(
+                                                color=ft.colors.WHITE,
+                                                padding=10,
+                                            )
                                         )
                                     )
-
-                            # 都道府県レベルの ExpansionTile
-                            sub_areas.append(
-                                ft.ExpansionTile(
-                                    title=ft.Text(office_info['name']),
-                                    controls=sub_regions
-                                )
-                            )
 
                 # 地方レベルの ExpansionTile
                 area_tree.controls.append(
                     ft.ExpansionTile(
-                        title=ft.Text(center_info['name']),
-                        controls=sub_areas
+                        title=ft.Text(
+                            center_info['name'],
+                            color=ft.colors.WHITE,
+                            size=16,
+                            weight=ft.FontWeight.BOLD
+                        ),
+                        controls=sub_areas,
+                        bgcolor=ft.colors.BLUE_GREY_700,
                     )
                 )
 
@@ -114,26 +120,32 @@ def main(page: ft.Page):
 
     # 天気情報表示エリア
     weather_display = ft.Container(
-        content=ft.Text("地域を選択してください"),
+        content=ft.Text(
+            "地域を選択してください",
+            color=ft.colors.BLACK,
+            size=16
+        ),
         expand=True,
-        padding=20
+        padding=20,
+        bgcolor=ft.colors.WHITE
     )
 
     # メインレイアウト
     page.add(
         ft.Row(
             controls=[
-                # 左側：階層構造の地域リスト
                 ft.Container(
                     content=create_area_tree(),
                     width=300,
-                    bgcolor=ft.colors.BLUE_GREY_100,
+                    bgcolor=ft.colors.BLUE_GREY_900,
                 ),
-                # 右側：天気情報
                 weather_display
             ],
             expand=True
         )
     )
+
+    page.bgcolor = ft.colors.WHITE
+    page.update()
 
 ft.app(target=main)
