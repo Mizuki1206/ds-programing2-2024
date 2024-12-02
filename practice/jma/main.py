@@ -1,7 +1,5 @@
 import requests
-import tkinter as tk
-from tkinter import ttk
-import json
+import flet
 
 class WeatherApp:
     def __init__(self, master):
