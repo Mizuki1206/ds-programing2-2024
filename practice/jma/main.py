@@ -1,220 +1,73 @@
-import flet as ft
+import requests
+import tkinter as tk
+from tkinter import ttk
 import json
-import os
-from datetime import datetime
-
-# ファイルパスの設定
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-AREAS_JSON_PATH = os.path.join(CURRENT_DIR, 'areas.json')
-FORECAST_JSON_PATH = os.path.join(CURRENT_DIR, 'forecast.json')
 
 class WeatherApp:
-    def __init__(self):
-        self.area_data = None
-        self.current_weather_data = None
-        self.load_data()
+    def __init__(self, master):
+        self.master = master
+        master.title("天気予報")
 
-    def load_data(self):
-        # 地域データの読み込み
-        try:
-            with open(AREAS_JSON_PATH, 'r', encoding='utf-8') as f:
-                self.area_data = json.load(f)
-            print("Areas data loaded successfully")  # デバッグ用
-        except Exception as e:
-            print(f"Error loading area data: {e}")
-            self.area_data = {}
+        # 地域選択用のドロップダウンメニューを作成
+        self.region_label = tk.Label(master, text="地域を選択:")
+        self.region_label.pack(pady=10)
 
-    def get_weather_data(self, area_code):
-        # 天気データの読み込み
-        try:
-            with open(FORECAST_JSON_PATH, 'r', encoding='utf-8') as f:
-                self.current_weather_data = json.load(f)
-            print("Weather data loaded successfully")  # デバッグ用
-            return self.current_weather_data
-        except Exception as e:
-            print(f"Error loading weather data: {e}")
-            return None
+        self.region_var = tk.StringVar()
+        self.region_dropdown = ttk.Combobox(master, textvariable=self.region_var)
+        self.region_dropdown.pack()
 
-def format_date(date_str):
-    dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-    return dt.strftime('%m/%d')
+        # 地域コードの辞書を作成
+        self.region_codes = {
+            "北海道地方": "010100",
+            "東北地方": "020000",
+            "関東地方": "040000",
+            "中部地方": "050000",
+            "近畿地方": "060000",
+            "中国地方": "070000",
+            "四国地方": "080000",
+            "九州地方": "090000"
+        }
 
-def get_weather_icon(weather_code):
-    weather_icons = {
-        "100": "☀️",  # 晴れ
-        "101": "🌤️",  # 晴れ時々曇り
-        "200": "☁️",  # くもり
-        "201": "⛅",  # くもり時々晴れ
-        "202": "🌥️",  # くもり一時晴れ
-        "300": "🌧️",  # 雨
-        "301": "🌦️",  # 雨時々晴れ
-        "302": "🌧️",  # 雨一時晴れ
-        "400": "🌨️",  # 雪
-    }
-    return weather_icons.get(weather_code[:3], "❓")
+        # ドロップダウンメニューにオプションを設定
+        self.region_dropdown["values"] = list(self.region_codes.keys())
+        self.region_dropdown.current(0)  # 初期値を北海道地方に設定
 
-class WeatherView(ft.UserControl):
-    def __init__(self, weather_data):
-        super().__init__()
-        self.weather_data = weather_data
+        # 天気予報を表示するラベルを作成
+        self.weather_label = tk.Label(master, text="", font=("Arial", 16))
+        self.weather_label.pack(pady=20)
 
-    def build(self):
-        if not self.weather_data:
-            return ft.Text("天気データを取得できません")
+        # 天気予報を取得するボタンを作成
+        self.get_forecast_button = tk.Button(master, text="天気予報を取得", command=self.get_weather_forecast)
+        self.get_forecast_button.pack(pady=10)
+
+    def get_weather_forecast(self):
+        # 選択された地域のエリアコードを取得
+        selected_region = self.region_var.get()
+        area_code = self.region_codes[selected_region]
+
+        # 気象庁のAPIからデータを取得
+        area_url = f"https://www.jma.go.jp/bosai/common/const/area.json"
+        forecast_url = f"https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json"
 
         try:
-            # 天気予報データの取得
-            time_series = self.weather_data[0]['timeSeries']
-            weather_info = time_series[0]  # 天気情報
-            temp_info = time_series[2]     # 気温情報
+            # エリア情報を取得
+            area_response = requests.get(area_url)
+            area_data = area_response.json()
 
-            # 天気予報カードの作成
-            weather_cards = []
-            for i, date in enumerate(weather_info['timeDefines']):
-                area_info = weather_info['areas'][0]  # 最初のエリアのデータを使用
-                weather_code = area_info['weatherCodes'][i]
-                weather_desc = area_info['weathers'][i]
+            # 天気予報データを取得
+            forecast_response = requests.get(forecast_url)
+            forecast_data = forecast_response.json()
 
-                # 気温データの取得
-                temp = "-- ℃"
-                if i < len(temp_info['areas'][0]['temps']):
-                    temp = f"{temp_info['areas'][0]['temps'][i]} ℃"
+            # 天気予報の情報を抽出
+            today_weather = forecast_data[0]["timeSeries"][0]["areas"][0]
+            weather_text = f"{today_weather['weathers'][0]}\n気温: {today_weather['temps'][0]}°C"
 
-                card = ft.Card(
-                    content=ft.Container(
-                        padding=20,
-                        content=ft.Column([
-                            ft.Text(format_date(date), 
-                                   size=16, 
-                                   weight=ft.FontWeight.BOLD),
-                            ft.Text(get_weather_icon(weather_code), 
-                                   size=32),
-                            ft.Text(weather_desc, 
-                                   size=14, 
-                                   text_align=ft.TextAlign.CENTER),
-                            ft.Text(f"気温: {temp}", 
-                                   size=14),
-                        ], 
-                        spacing=10,
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        )
-                    )
-                )
-                weather_cards.append(card)
+            # 天気予報を表示
+            self.weather_label.config(text=weather_text)
 
-            return ft.Column([
-                ft.Text(
-                    f"地域: {weather_info['areas'][0]['area']['name']}",
-                    size=20,
-                    weight=ft.FontWeight.BOLD
-                ),
-                ft.Row(
-                    controls=weather_cards,
-                    scroll=ft.ScrollMode.AUTO,
-                    spacing=10,
-                )
-            ])
-        except Exception as e:
-            print(f"Error building weather view: {e}")
-            return ft.Text("天気データの表示中にエラーが発生しました")
+        except requests.exceptions.RequestException as e:
+            self.weather_label.config(text=f"エラーが発生しました: {e}")
 
-def main(page: ft.Page):
-    page.title = "天気予報アプリ"
-    page.padding = 20
-    page.theme_mode = ft.ThemeMode.LIGHT
-
-    weather_app = WeatherApp()
-
-    # 天気表示用のコンテナ
-    weather_container = ft.Container(
-        content=ft.Text("地域を選択してください"),
-        expand=True
-    )
-
-    def on_region_select(e):
-        # 地域が選択されたときの処理
-        region_code = e.control.data
-        weather_data = weather_app.get_weather_data(region_code)
-        
-        # 天気表示を更新
-        weather_container.content = WeatherView(weather_data)
-        page.update()
-
-    try:
-        with open(AREAS_JSON_PATH, 'r', encoding='utf-8') as f:
-            areas_data = json.load(f)
-
-        def create_navigation_items():
-            navigation_items = []
-            
-            # 地方（centers）のループ
-            for center_code, center_info in areas_data['centers'].items():
-                center_children = []
-                
-                # 各地方の子要素（offices）を処理
-                for office_code in center_info['children']:
-                    if office_code in areas_data['offices']:
-                        office_info = areas_data['offices'][office_code]
-                        
-                        # class10sの情報を取得
-                        class10_children = []
-                        for class10_code in office_info['children']:
-                            if class10_code in areas_data['class10s']:
-                                class10_info = areas_data['class10s'][class10_code]
-                                class10_children.append(
-                                    ft.NavigationRailDestination(
-                                        icon=ft.icons.LOCATION_ON_OUTLINED,
-                                        selected_icon=ft.icons.LOCATION_ON,
-                                        label=class10_info['name'],
-                                        data=class10_code
-                                    )
-                                )
-                        
-                        # officesレベルのナビゲーションアイテム
-                        center_children.append(
-                            ft.ExpansionTile(
-                                title=ft.Text(office_info['name']),
-                                subtitle=ft.Text(office_info['officeName']),
-                                children=class10_children
-                            )
-                        )
-
-                # centersレベルのナビゲーションアイテム
-                navigation_items.append(
-                    ft.ExpansionTile(
-                        title=ft.Text(center_info['name']),
-                        subtitle=ft.Text(center_info['officeName']),
-                        children=center_children
-                    )
-                )
-            
-            return navigation_items
-
-        # ナビゲーションパネルの作成
-        navigation_panel = ft.Column(
-            controls=create_navigation_items(),
-            scroll=ft.ScrollMode.AUTO,
-            expand=True
-        )
-
-    except Exception as e:
-        print(f"Error loading areas data: {e}")
-        navigation_panel = ft.Column([
-            ft.Text("データの読み込みに失敗しました")
-        ])
-
-    # メインレイアウト
-    page.add(
-        ft.Row([
-            ft.Container(
-                content=navigation_panel,
-                width=300,
-                border=ft.border.all(1, ft.colors.OUTLINE),
-            ),
-            ft.VerticalDivider(width=1),
-            weather_container
-        ], expand=True)
-    )
-
-if __name__ == '__main__':
-    ft.app(target=main)
+root = tk.Tk()
+app = WeatherApp(root)
+root.mainloop()
