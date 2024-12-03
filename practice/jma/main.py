@@ -6,27 +6,35 @@ from datetime import datetime
 def main(page: ft.Page):
     # ページの基本設定
     page.title = "天気予報アプリ"
-    page.bgcolor = "#E8E8E8"  # 背景色をグレーに
-    page.padding = 0  # パディングを0に
+    page.bgcolor = "#E8E8E8"
+    # 余白をなくす
+    page.padding = 0
 
+    # ネットから地域データを取得
     def fetch_area_data():
         try:
+            # 気象庁の地域データを取得
             response = requests.get("https://www.jma.go.jp/bosai/common/const/area.json")
             return response.json()
         except:
             return None
 
+    # 指定した地域の天気情報を取得
     def fetch_weather_data(area_code):
         try:
+            # 気象庁の天気予報データを取得
             response = requests.get(f"https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json")
             return response.json()
         except:
             return None
 
+    # 日時文字列をフォーマット
     def format_datetime(datetime_str):
+        # 日付と時間を指定する
         dt = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
         return dt.strftime('%Y年%m月%d日 %H時%M分')
 
+    # 天気情報から絵文字を取得
     def get_weather_emoji(weather):
         weather_emojis = {
             "晴れ": "☀️",
@@ -45,25 +53,28 @@ def main(page: ft.Page):
             "曇のち雨": "🌧️",
             "雨のち曇": "🌥️",
         }
-        # 部分一致で検索
+
+        # 天気に合う絵文字を探して返す
         for key in weather_emojis:
             if key in weather:
                 return weather_emojis[key]
-        return "🌈"
+        return "🌈" # どの天気にも当てはまらない場合は虹
 
+    # 天気カードを作成
     def create_weather_card(date, weather, temp_min, temp_max):
+        # 一日分の天気情報を表示するカードを作成
         weather_emoji = get_weather_emoji(weather)
         return ft.Container(
             content=ft.Column(
                 controls=[
                     ft.Text(date, size=16, weight=ft.FontWeight.BOLD, color="black"),
-                    ft.Text(weather_emoji, size=30),  # 絵文字を追加
+                    ft.Text(weather_emoji, size=30),  # 天気の絵文字を追加
                     ft.Text(weather, size=20, color="black"),
                     ft.Row(
                         controls=[
-                            ft.Text(f"{temp_min}°C", size=16, color="blue"),
+                            ft.Text(f"{temp_min}°C", size=16, color="blue"), # 最低気温
                             ft.Text(" / ", size=16, color="black"),
-                            ft.Text(f"{temp_max}°C", size=16, color="red"),
+                            ft.Text(f"{temp_max}°C", size=16, color="red"), # 最高気温
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
                     )
@@ -76,7 +87,9 @@ def main(page: ft.Page):
             width=200,
         )
 
+    # 天気情報を整形して表示
     def format_weather_info(weather_data):
+        # 取得した天気データを見やすくする
         if not weather_data:
             return ft.Text("天気情報を取得できませんでした。")
 
@@ -94,13 +107,13 @@ def main(page: ft.Page):
                 color="black"
             )
 
-        # 一週間分の天気予報カードを作成
+            # 天気予報カードの作成
             for i in range(len(weather_info['timeSeries'][0]['timeDefines'])):
                 try:
                     date = datetime.fromisoformat(weather_info['timeSeries'][0]['timeDefines'][i].replace('Z', '+00:00')).strftime('%m/%d')
                     weather = weather_info['timeSeries'][0]['areas'][0]['weathers'][i]
                     
-                    # 気温情報の取得（利用可能な場合）
+                    # 気温情報を取得（利用可能な場合）
                     temp_min = "--"
                     temp_max = "--"
                     if len(weather_info['timeSeries']) > 2:
@@ -109,12 +122,13 @@ def main(page: ft.Page):
                             temp_min = temps[i*2]
                             temp_max = temps[i*2+1]
 
+                    # 天気カードを作成して追加
                     card = create_weather_card(date, weather, temp_min, temp_max)
                     weather_cards.controls.append(card)
                 except Exception as e:
                     print(f"カード作成エラー: {str(e)}")
 
-            # 情報をColumnで縦に並べて返す
+            # 情報をColumnで縦に並べて表示
             return ft.Column(
                 controls=[
                     basic_info,
@@ -126,10 +140,12 @@ def main(page: ft.Page):
         except Exception as e:
             return ft.Text(f"天気情報の解析中にエラーが発生しました: {str(e)}")
 
+    # ドロップダウンの選択肢が変更されたときの処理
     def on_region_selected(e):
         selected_center = region_dropdown.value
         if selected_center:
             prefecture_options = []
+            # 選んだ地方に属する県を探してリストに追加
             for office_code, office_info in area_data['offices'].items():
                 if office_code.endswith('000'):
                     parent_center = office_info.get('parent')
@@ -145,9 +161,11 @@ def main(page: ft.Page):
             weather_text.content = None
             page.update()
 
+    # 県を選んだときに天気情報を表示する
     def on_prefecture_selected(e):
         selected_code = prefecture_dropdown.value
         if selected_code:
+            # 選んだ県の天気情報を取得して表示
             weather_data = fetch_weather_data(selected_code)
             weather_text.content = format_weather_info(weather_data)
             page.update()
@@ -156,6 +174,7 @@ def main(page: ft.Page):
     area_data = fetch_area_data()
     region_options = []
     if area_data and 'centers' in area_data:
+        # 地方のリストを作成
         for center_code, center_info in area_data['centers'].items():
             region_options.append(
                 ft.dropdown.Option(
@@ -164,7 +183,7 @@ def main(page: ft.Page):
                 )
             )
 
-    # ドロップダウンの作成
+    # 地方選択のドロップダウンメニューの作成
     region_dropdown = ft.Dropdown(
         label="地方を選択",
         options=region_options,
@@ -176,6 +195,7 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color="black")
     )
 
+    # 県選択のドロップダウンメニューの作成
     prefecture_dropdown = ft.Dropdown(
         label="県を選択",
         options=[],
@@ -187,6 +207,7 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color="black")
     )
 
+    # 天気情報を表示するエリア
     weather_text = ft.Container(
         content=None,
         expand=True
@@ -206,7 +227,7 @@ def main(page: ft.Page):
         width=page.window_width
     )
 
-    # 左側のパネル
+    # 左側のパネル(地方と県の選択)
     left_panel = ft.Container(
         content=ft.Column(
             controls=[
@@ -224,7 +245,7 @@ def main(page: ft.Page):
         height=page.window_height
     )
 
-    # メインコンテンツエリア
+    # メインの天気情報を表示するエリア
     main_content = ft.Container(
         content=weather_text,
         expand=True,
@@ -232,7 +253,7 @@ def main(page: ft.Page):
         bgcolor="#E8E8E8"
     )
 
-    # レイアウトの構成
+    # ページに全てのコンポーネントを追加
     page.add(
         header,
         ft.Row(
