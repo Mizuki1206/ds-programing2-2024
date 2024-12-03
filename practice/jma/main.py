@@ -1,151 +1,254 @@
 import requests
 import flet as ft
 import json
+from datetime import datetime
 
 def main(page: ft.Page):
+    # ページの基本設定
     page.title = "天気予報アプリ"
-    page.window_width = 1000
-    page.window_height = 600
+    page.bgcolor = "#E8E8E8"  # 背景色をグレーに
+    page.padding = 0  # パディングを0に
 
-    def get_area_data():
+    def fetch_area_data():
         try:
-            response = requests.get('https://www.jma.go.jp/bosai/common/const/area.json')
+            response = requests.get("https://www.jma.go.jp/bosai/common/const/area.json")
             return response.json()
         except:
-            return {}
+            return None
 
-    def get_weather_data(area_code):
+    def fetch_weather_data(area_code):
         try:
-            url = f'https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json'
-            response = requests.get(url)
-            return response.json()[0]
+            response = requests.get(f"https://www.jma.go.jp/bosai/forecast/data/forecast/{area_code}.json")
+            return response.json()
         except:
-            return {}
+            return None
 
-    def on_area_select(e):
-        area_code = e.control.data
-        area_name = e.control.text  # ボタンのテキスト（地域名）を取得
-        weather_data = get_weather_data(area_code)
-        
-        if weather_data:
-            try:
-                weather_info = weather_data['timeSeries'][0]['areas'][0]
-                temps = weather_data['timeSeries'][2]['areas'][0]['temps']
-                
-                weather_display.content = ft.Column(
-                    controls=[
-                        ft.Card(
-                            content=ft.Container(
-                                content=ft.Column(
-                                    controls=[
-                                        ft.Text(
-                                            f"地域: {area_name}", 
-                                            size=20, 
-                                            weight=ft.FontWeight.BOLD,
-                                            color=ft.colors.BLACK
-                                        ),
-                                        ft.Text(
-                                            f"天気: {weather_info.get('weathers', ['データなし'])[0]}", 
-                                            size=16,
-                                            color=ft.colors.BLACK
-                                        ),
-                                        ft.Text(
-                                            f"気温: {temps[0]}℃", 
-                                            size=16,
-                                            color=ft.colors.BLACK
-                                        ),
-                                    ]
-                                ),
-                                padding=20,
-                                bgcolor=ft.colors.WHITE
+    def format_datetime(datetime_str):
+        dt = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
+        return dt.strftime('%Y年%m月%d日 %H時%M分')
+
+    def get_weather_emoji(weather):
+        weather_emojis = {
+            "晴れ": "☀️",
+            "晴": "☀️",
+            "曇り": "☁️",
+            "曇": "☁️",
+            "雨": "🌧️",
+            "雪": "❄️",
+            "晴時々曇": "🌤️",
+            "晴一時雨": "🌦️",
+            "晴時々雨": "🌦️",
+            "曇時々晴": "⛅",
+            "曇一時雨": "🌧️",
+            "晴のち曇": "🌥️",
+            "晴のち雨": "🌦️",
+            "曇のち雨": "🌧️",
+            "雨のち曇": "🌥️",
+        }
+        # 部分一致で検索
+        for key in weather_emojis:
+            if key in weather:
+                return weather_emojis[key]
+        return "🌈"
+
+    def create_weather_card(date, weather, temp_min, temp_max):
+        weather_emoji = get_weather_emoji(weather)
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text(date, size=16, weight=ft.FontWeight.BOLD, color="black"),
+                    ft.Text(weather_emoji, size=30),  # 絵文字を追加
+                    ft.Text(weather, size=20, color="black"),
+                    ft.Row(
+                        controls=[
+                            ft.Text(f"{temp_min}°C", size=16, color="blue"),
+                            ft.Text(" / ", size=16, color="black"),
+                            ft.Text(f"{temp_max}°C", size=16, color="red"),
+                        ],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                    )
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            padding=20,
+            bgcolor="white",
+            border_radius=10,
+            width=200,
+        )
+
+    def format_weather_info(weather_data):
+        if not weather_data:
+            return ft.Text("天気情報を取得できませんでした。")
+
+        try:
+            weather_info = weather_data[0]
+            weather_cards = ft.Row(controls=[], wrap=True, spacing=10)
+
+            # 基本情報の表示
+            basic_info = ft.Text(
+                f"""発表元: {weather_info['publishingOffice']}
+発表時刻: {format_datetime(weather_info['reportDatetime'])}
+地域: {weather_info['timeSeries'][0]['areas'][0]['area']['name']}""",
+                size=16,
+                weight=ft.FontWeight.NORMAL,
+                color="black"
+            )
+
+        # 一週間分の天気予報カードを作成
+            for i in range(len(weather_info['timeSeries'][0]['timeDefines'])):
+                try:
+                    date = datetime.fromisoformat(weather_info['timeSeries'][0]['timeDefines'][i].replace('Z', '+00:00')).strftime('%m/%d')
+                    weather = weather_info['timeSeries'][0]['areas'][0]['weathers'][i]
+                    
+                    # 気温情報の取得（利用可能な場合）
+                    temp_min = "--"
+                    temp_max = "--"
+                    if len(weather_info['timeSeries']) > 2:
+                        temps = weather_info['timeSeries'][2]['areas'][0].get('temps', [])
+                        if len(temps) > i*2+1:
+                            temp_min = temps[i*2]
+                            temp_max = temps[i*2+1]
+
+                    card = create_weather_card(date, weather, temp_min, temp_max)
+                    weather_cards.controls.append(card)
+                except Exception as e:
+                    print(f"カード作成エラー: {str(e)}")
+
+            # 情報をColumnで縦に並べて返す
+            return ft.Column(
+                controls=[
+                    basic_info,
+                    weather_cards
+                ],
+                scroll=ft.ScrollMode.AUTO
+            )
+
+        except Exception as e:
+            return ft.Text(f"天気情報の解析中にエラーが発生しました: {str(e)}")
+
+    def on_region_selected(e):
+        selected_center = region_dropdown.value
+        if selected_center:
+            prefecture_options = []
+            for office_code, office_info in area_data['offices'].items():
+                if office_code.endswith('000'):
+                    parent_center = office_info.get('parent')
+                    if parent_center == selected_center:
+                        prefecture_options.append(
+                            ft.dropdown.Option(
+                                key=office_code,
+                                text=office_info['name']
                             )
                         )
-                    ]
+            prefecture_dropdown.options = prefecture_options
+            prefecture_dropdown.value = None
+            weather_text.content = None
+            page.update()
+
+    def on_prefecture_selected(e):
+        selected_code = prefecture_dropdown.value
+        if selected_code:
+            weather_data = fetch_weather_data(selected_code)
+            weather_text.content = format_weather_info(weather_data)
+            page.update()
+
+    # 地域データの取得と選択肢の作成
+    area_data = fetch_area_data()
+    region_options = []
+    if area_data and 'centers' in area_data:
+        for center_code, center_info in area_data['centers'].items():
+            region_options.append(
+                ft.dropdown.Option(
+                    key=center_code,
+                    text=center_info['name']
                 )
-                page.update()
-            except:
-                weather_display.content = ft.Text("データの取得に失敗しました")
-                page.update()
+            )
 
-    def create_area_tree():
-        area_data = get_area_data()
-        area_tree = ft.ListView(expand=1, spacing=10, padding=20)
-
-        # 地域名とコードのマッピングを作成
-        area_names = {}
-        if 'offices' in area_data:
-            for code, info in area_data['offices'].items():
-                area_names[code] = info['name']
-
-        if 'centers' in area_data and 'offices' in area_data:
-            for center_code, center_info in area_data['centers'].items():
-                sub_areas = []
-                
-                if 'children' in center_info:
-                    for office_code in center_info['children']:
-                        if office_code in area_data['offices']:
-                            office_info = area_data['offices'][office_code]
-                            
-                            if 'children' in office_info:
-                                for child_code in office_info['children']:
-                                    # 地域名を取得（存在しない場合はコードを使用）
-                                    area_name = area_names.get(child_code, child_code)
-                                    sub_areas.append(
-                                        ft.TextButton(
-                                            text=area_name,  # 地域名を表示
-                                            data=child_code,  # コードはデータとして保持
-                                            on_click=on_area_select,
-                                            style=ft.ButtonStyle(
-                                                color=ft.colors.WHITE,
-                                                padding=10,
-                                            )
-                                        )
-                                    )
-
-                # 地方レベルの ExpansionTile
-                area_tree.controls.append(
-                    ft.ExpansionTile(
-                        title=ft.Text(
-                            center_info['name'],
-                            color=ft.colors.WHITE,
-                            size=16,
-                            weight=ft.FontWeight.BOLD
-                        ),
-                        controls=sub_areas,
-                        bgcolor=ft.colors.BLUE_GREY_700,
-                    )
-                )
-
-        return area_tree
-
-    # 天気情報表示エリア
-    weather_display = ft.Container(
-        content=ft.Text(
-            "地域を選択してください",
-            color=ft.colors.BLACK,
-            size=16
-        ),
-        expand=True,
-        padding=20,
-        bgcolor=ft.colors.WHITE
+    # ドロップダウンの作成
+    region_dropdown = ft.Dropdown(
+        label="地方を選択",
+        options=region_options,
+        on_change=on_region_selected,
+        width=250,
+        bgcolor="white",
+        border_color="transparent",
+        text_style=ft.TextStyle(color="black"),
+        label_style=ft.TextStyle(color="black")
     )
 
-    # メインレイアウト
-    page.add(
-        ft.Row(
+    prefecture_dropdown = ft.Dropdown(
+        label="県を選択",
+        options=[],
+        on_change=on_prefecture_selected,
+        width=250,
+        bgcolor="white",
+        border_color="transparent",
+        text_style=ft.TextStyle(color="black"),
+        label_style=ft.TextStyle(color="black")
+    )
+
+    weather_text = ft.Container(
+        content=None,
+        expand=True
+    )
+
+    # ヘッダーの作成
+    header = ft.Container(
+        content=ft.Row(
+            controls=[
+                ft.Icon(name=ft.icons.WB_SUNNY, color="white", size=30),
+                ft.Text("天気予報", color="white", size=24, weight=ft.FontWeight.BOLD),
+            ],
+            spacing=10
+        ),
+        padding=ft.padding.only(left=20, right=20, top=10, bottom=10),
+        bgcolor="#3F51B5",
+        width=page.window_width
+    )
+
+    # 左側のパネル
+    left_panel = ft.Container(
+        content=ft.Column(
             controls=[
                 ft.Container(
-                    content=create_area_tree(),
-                    width=300,
-                    bgcolor=ft.colors.BLUE_GREY_900,
+                    content=ft.Column([
+                        region_dropdown,
+                        prefecture_dropdown
+                    ]),
+                    padding=20,
                 ),
-                weather_display
             ],
-            expand=True
+        ),
+        width=300,
+        bgcolor="#9EA7BE",
+        height=page.window_height
+    )
+
+    # メインコンテンツエリア
+    main_content = ft.Container(
+        content=weather_text,
+        expand=True,
+        padding=20,
+        bgcolor="#E8E8E8"
+    )
+
+    # レイアウトの構成
+    page.add(
+        header,
+        ft.Row(
+            controls=[
+                left_panel,
+                main_content
+            ],
+            expand=True,
         )
     )
 
-    page.bgcolor = ft.colors.WHITE
-    page.update()
+    # ウィンドウサイズ変更時の処理
+    def on_resize(e):
+        header.width = page.window_width
+        page.update()
+
+    page.on_resize = on_resize
 
 ft.app(target=main)
