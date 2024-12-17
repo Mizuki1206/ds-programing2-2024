@@ -26,7 +26,7 @@ def init_db():
     # 天気予報テーブル
     c.execute('''CREATE TABLE IF NOT EXISTS weather_forecasts
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, area_code TEXT NOT NULL, 
-              forecast_target_data TEXT NOT NULL, forecast_publish_time TEXT NOT NULL, 
+              forecast_target_date TEXT NOT NULL, forecast_publish_time TEXT NOT NULL, 
               weather_code TEXT, weather_text TEXT, temperature_min INTEGER, 
                 temperature_max INTEGER, temperature_min_upper INTEGER, 
               temperature_min_lower INTEGER, temperature_max_upper INTEGER, 
