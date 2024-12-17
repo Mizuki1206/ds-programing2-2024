@@ -38,7 +38,7 @@ def init_db():
     return conn
 
 def load_area_data():
-    with open('areas.json', 'r', encoding='utf-8') as f:
+    with open('area.json', 'r', encoding='utf-8') as f:
         area_data = json.load(f)
         conn = init_db()
         cursor = conn.cursor()
@@ -51,12 +51,12 @@ def load_area_data():
         # officesデータの保存
         for code, data in area_data['offices'].items():
             cursor.execute('''INSERT OR REPLACE INTO prefectures(prefecture_code, prefecture_name, prefecture_en_name, region_code, office_name)
-                                VALUES(?, ?, ?, ?, ?)''', (code, data['name'], data['enName'], data.get['parent'], data['officeName']))
+                                VALUES(?, ?, ?, ?, ?)''', (code, data['name'], data['enName'], data.get('parent'), data['officeName']))
             
         # class20sデータの保存
         for code, data in area_data['class20s'].items():
             cursor.execute('''INSERT OR REPLACE INTO cities(city_code, city_name, city_en_name, city_kana, prefecture_code)
-                                VALUES(?, ?, ?, ?, ?)''', (code, data['name'], data['enName'], data['kana'], data.get['parent']))
+                                VALUES(?, ?, ?, ?, ?)''', (code, data['name'], data['enName'], data['kana'], data.get('parent')))
             
         conn.commit()
         return conn
