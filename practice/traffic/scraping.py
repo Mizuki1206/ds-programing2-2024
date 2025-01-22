@@ -40,10 +40,12 @@ class PopulationScraper:
             data = []
             table = soup.find('table')
             rows = table.find_all('tr')
-            
-            for row in rows[1:]:  # ヘッダー行をスキップ
+
+            # ヘッダー行をスキップ
+            for row in rows[1:]:
                 cols = row.find_all('td')
-                if len(cols) >= 7:  # 必要な列数があることを確認
+                # 必要な列数があることを確認
+                if len(cols) >= 7:
                     data.append({
                         'prefecture': cols[0].text.strip(),
                         'prefecture_kana': cols[1].text.strip(),

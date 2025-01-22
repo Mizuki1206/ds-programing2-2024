@@ -192,7 +192,6 @@ class TrafficAnalyzer:
             return None
 
 if __name__ == "__main__":
-    # TrafficAnalyzerのインスタンスを作成
     analyzer = TrafficAnalyzer()
     
     # データの読み込みと処理を実行
